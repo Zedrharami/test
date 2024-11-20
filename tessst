@@ -1,0 +1,64 @@
+#include "sierrachart.h"
+
+// Define inputs for position size and other parameters
+SCSFExport scsf_HeikinAshiStrategy(SCStudyInterfaceRef sc)
+{
+    // Set defaults
+    if (sc.SetDefaults)
+    {
+        sc.GraphName = "Heikin Ashi Strategy";
+        sc.StudyDescription = "Heikin Ashi Strategy with Fixed 20,000 Contract Size";
+
+        // Input for contract size
+        sc.Input[0].Name = "Position Size (Contracts)";
+        sc.Input[0].SetInt(20000);
+
+        sc.AutoLoop = 1;  // Enable AutoLoop
+        return;
+    }
+
+    // Variables to store Heikin Ashi values
+    float heikin_ashi_open, heikin_ashi_close, heikin_ashi_high, heikin_ashi_low;
+
+    // Heikin Ashi Calculations
+    heikin_ashi_close = (sc.Open[sc.Index] + sc.High[sc.Index] + sc.Low[sc.Index] + sc.Close[sc.Index]) / 4.0;
+    if (sc.Index == 0)
+    {
+        heikin_ashi_open = (sc.Open[sc.Index] + sc.Close[sc.Index]) / 2.0;
+    }
+    else
+    {
+        heikin_ashi_open = (sc.Open[sc.Index - 1] + sc.Close[sc.Index - 1]) / 2.0;
+    }
+    
+    // Heikin Ashi High and Low (Maximum and minimum of open, close, high, low)
+    heikin_ashi_high = max(max(sc.High[sc.Index], sc.Close[sc.Index]), heikin_ashi_open);
+    heikin_ashi_low = min(min(sc.Low[sc.Index], sc.Close[sc.Index]), heikin_ashi_open);
+
+    // Conditions for long and short positions (color change in Heikin Ashi)
+    bool long_condition = (heikin_ashi_close > heikin_ashi_open && sc.Close[sc.Index] < sc.Open[sc.Index]);
+    bool short_condition = (heikin_ashi_close < heikin_ashi_open && sc.Close[sc.Index] > sc.Open[sc.Index]);
+
+    // Entry and Exit conditions
+    // If a long condition is met, open a long position with fixed contract size
+    if (long_condition && !sc.PositionIsOpen)
+    {
+        sc.EnterLong(sc.Input[0].GetInt(), "Long");
+    }
+    // If a short condition is met, open a short position with fixed contract size
+    else if (short_condition && !sc.PositionIsOpen)
+    {
+        sc.EnterShort(sc.Input[0].GetInt(), "Short");
+    }
+    
+    // Exit positions on reversal (next opposite signal)
+    if (long_condition && sc.PositionIsOpen && sc.PositionIsShort)
+    {
+        sc.ExitPosition("Exit Short", "Short");
+    }
+    else if (short_condition && sc.PositionIsOpen && sc.PositionIsLong)
+    {
+        sc.ExitPosition("Exit Long", "Long");
+    }
+}
+
